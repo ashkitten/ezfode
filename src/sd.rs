@@ -1,8 +1,6 @@
 use core::ffi::c_void;
 use core::fmt;
 
-use gba::prelude::*;
-
 use crate::delay;
 use crate::dma::dma_copy;
 use crate::ezflash::set_rompage;
@@ -47,7 +45,7 @@ pub unsafe fn wait_sd_response() -> Result<(), ()> {
     }
 
     // timeout!
-    return Err(());
+    Err(())
 }
 
 pub type Lba = u32;
@@ -67,7 +65,7 @@ pub enum BlockIoError {}
 pub struct SdCard;
 
 impl SdCard {
-    pub fn partition<'d>(&'d mut self, start: Lba, end: Lba) -> Partition<'d, 512, Self> {
+    pub fn partition(&mut self, start: Lba, end: Lba) -> Partition<'_, 512, Self> {
         Partition {
             disk: self,
             start,
@@ -87,7 +85,7 @@ impl BlockIo<512> for SdCard {
             // we can't overrun, and we need whole blocks
             // 2 ^ 9 = 512
             let count = (buffer.len() >> 9) as u32;
-            for i in (0..count).step_by(4) {
+            'chunks: for i in (0..count).step_by(4) {
                 // read at most 4 blocks at a time
                 let blocks = 4.min(count - i) as u16;
                 // low and high 16 bits of the address
@@ -113,7 +111,7 @@ impl BlockIo<512> for SdCard {
                         dma_copy(src, dst, blocks as u32 * 512);
 
                         // keep copying chunks
-                        break;
+                        continue 'chunks;
                     } else {
                         // read timed out, try again
                         sd_enable();

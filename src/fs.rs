@@ -91,7 +91,7 @@ impl<const BS: usize, const PS: usize, IO: BlockIo<BS>> Seek for BufferedIo<BS, 
                 self.pos = usize::MAX - addr as usize;
             }
             SeekFrom::Current(addr) => {
-                self.pos = self.pos + addr as usize;
+                self.pos += addr as usize;
             }
         }
 
