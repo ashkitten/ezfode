@@ -3,17 +3,11 @@
 #![no_std]
 #![no_main]
 
-use ape_fatfs::{
-    error::Error,
-    fs::{FileSystem, FsOptions},
-};
+use ape_fatfs::fs::{FileSystem, FsOptions};
 use ape_mbr::{PartitionId, MBR};
-use embedded_io::blocking::Read;
 use fs::BufferedIo;
 use gba::prelude::*;
 use sd::SdCard;
-
-use crate::sd::BlockIo;
 
 mod dma;
 mod ezflash;

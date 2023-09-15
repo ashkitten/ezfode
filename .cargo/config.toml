@@ -3,7 +3,7 @@ build-std = ["core"]
 build-std-features = ["compiler-builtins-weak-intrinsics"]
 
 [build]
-target = "armv4t-none-eabi"
+target = "thumbv4t-none-eabi"
 
 [target.thumbv4t-none-eabi]
 rustflags = ["-Clink-arg=-Tmono_boot.ld", "-Ctarget-cpu=arm7tdmi"]
