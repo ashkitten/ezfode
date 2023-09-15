@@ -1,4 +1,3 @@
-#[link_section = ".iwram"]
 pub unsafe fn set_rompage(page: u16) {
     (0x9fe0000 as *mut u16).write_volatile(0xd200);
     (0x8000000 as *mut u16).write_volatile(0x1500);
