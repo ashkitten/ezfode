@@ -1,0 +1,19 @@
+[package]
+name = "ezfode"
+version = "0.1.0"
+authors = ["ashkitten"]
+edition = "2021"
+
+[dependencies]
+fatfs = { git = "https://github.com/rafalh/rust-fatfs", default-features = false }
+gba = "0.11.2"
+log = "=0.4.19"
+
+[profile.dev]
+opt-level = 3
+debug = true
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+debug = true
