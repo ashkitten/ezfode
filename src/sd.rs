@@ -87,7 +87,7 @@ impl BlockIo<512> for SdCard {
             // we can't overrun, and we need whole blocks
             // 2 ^ 9 = 512
             let count = (buffer.len() >> 9) as u32;
-            'chunks: for i in (0..count).step_by(4) {
+            for i in (0..count).step_by(4) {
                 // read at most 4 blocks at a time
                 let blocks = 4.min(count - i) as u16;
                 // low and high 16 bits of the address
@@ -106,19 +106,19 @@ impl BlockIo<512> for SdCard {
                     (0x9fc0000 as *mut u16).write_volatile(0x1500);
 
                     sd_read_state();
-                    let res = wait_sd_response();
-                    sd_enable();
-                    if res.is_ok() {
+                    if wait_sd_response().is_ok() {
                         // successful read!
                         let src = 0x9e00000 as *mut c_void;
                         let dst = &mut buffer[i as usize * 512] as *mut u8 as *mut c_void;
                         dma_copy(src, dst, blocks as u32 * 512);
-                        // keep copying chunks
-                        continue 'chunks;
-                    }
 
-                    // try again
-                    delay(5000);
+                        // keep copying chunks
+                        break;
+                    } else {
+                        // read timed out, try again
+                        sd_enable();
+                        delay(5000);
+                    }
                 }
 
                 // oh no! we couldn't read!

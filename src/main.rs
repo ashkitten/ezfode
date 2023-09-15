@@ -31,30 +31,11 @@ extern "C" fn main() -> ! {
     DISPCNT.write(DisplayControl::new().with_show_bg0(true));
     BACKDROP_COLOR.write(Color::YELLOW);
 
-    let fs = {
-        // let mut mbr = MBR::new(BufferedIo::<512, 2048, _>::new(SdCard)).unwrap();
-        // let mut partition = mbr.get_partition(PartitionId::One).unwrap();
-        let mut buf = [0; 2048];
-        SdCard.read_blocks(0, &mut buf).unwrap();
-        // assert!(buf.into_iter().any(|b| b != 0));
-        // let start: [u8; 4] = buf[0x01be + 0x08..0x01be + 0x08 + 4].try_into().unwrap();
-        // let start: u32 = u32::from_le_bytes(start);
-        // assert!(start > 0);
-        // let mut buf = [0; 39];
-        // assert!(partition.read(&mut buf).unwrap() == 0);
-        // let fs = match FileSystem::new(partition, FsOptions::new()) {
-        //     Ok(_) => BACKDROP_COLOR.write(Color::GREEN),
-        //     Err(Error::Io(fs::ErrorKind::ReadExactError)) => BACKDROP_COLOR.write(Color::MAGENTA),
-        //     Err(Error::CorruptedFileSystem) => BACKDROP_COLOR.write(Color::BLUE),
-        //     _ => unreachable!(),
-        // };
-    };
+    let mut mbr = MBR::new(BufferedIo::<512, 2048, _>::new(SdCard)).unwrap();
+    let partition = mbr.get_partition(PartitionId::One).unwrap();
+    let fs = FileSystem::new(partition, FsOptions::new()).unwrap();
 
     BACKDROP_COLOR.write(Color::GREEN);
-
-    // let mut sd = SdCard;
-    // let buf_io = BufferedIo::new(sd.partition(lba_range));
-    // let fs = FileSystem::new(buf_io, FsOptions::new()).unwrap();
 
     loop {}
 }
