@@ -12,7 +12,6 @@ SECTIONS {
   .text : {
     /* be sure that the ROM header is the very first */
     *(.text.gba_rom_header);
-    *(.text .text.*);
     . = ALIGN(4);
   } >rom = 0x00
 
@@ -26,6 +25,7 @@ SECTIONS {
   .data : {
     __iwram_start = ABSOLUTE(.);
     
+    *(.text .text.*);
     *(.data .data.*);
     *(.iwram .iwram.*);
     . = ALIGN(4);

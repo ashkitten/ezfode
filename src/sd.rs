@@ -1,6 +1,7 @@
 use core::ffi::c_void;
 
 use fatfs::{IoBase, Read, Seek, SeekFrom, Write};
+use gba::prelude::*;
 
 use crate::delay;
 use crate::dma::dma_copy;
@@ -52,53 +53,49 @@ pub unsafe fn wait_sd_response() -> u32 {
     }
 
     // timeout!
+    BACKDROP_COLOR.write(Color::BLUE);
     return 1;
 }
 
+/// read `count` 512-byte sectors starting from `address` into `buffer`
 #[link_section = ".iwram"]
 pub unsafe fn read_sd_sectors(address: u32, count: u16, buffer: &mut [u8]) {
     sd_enable();
 
-    let mut blocks;
-    let mut res;
-    let mut times = 2;
-
     for i in (0..count).step_by(4) {
         // read at most 4 blocks at a time
-        blocks = if count - i > 4 { 4 } else { count - i };
+        let blocks = if count - i > 4 { 4 } else { count - i };
+        let addr_l = ((address + i as u32) & 0x0000FFFF) as u16;
+        let addr_h = (((address + i as u32) & 0xFFFF0000) >> 16) as u16;
 
-        loop {
+        // try three times to read
+        for _ in 0..2 {
             unsafe {
                 (0x9fe0000 as *mut u16).write_volatile(0xd200);
                 (0x8000000 as *mut u16).write_volatile(0x1500);
                 (0x8020000 as *mut u16).write_volatile(0xd200);
                 (0x8040000 as *mut u16).write_volatile(0x1500);
-                (0x9600000 as *mut u16).write_volatile(((address + i as u32) & 0x0000FFFF) as u16);
-                (0x9620000 as *mut u16)
-                    .write_volatile((((address + i as u32) & 0xFFFF0000) >> 16) as u16);
+                (0x9600000 as *mut u16).write_volatile(addr_l);
+                (0x9620000 as *mut u16).write_volatile(addr_h);
                 (0x9640000 as *mut u16).write_volatile(blocks);
                 (0x9fc0000 as *mut u16).write_volatile(0x1500);
             }
 
             sd_read_state();
-            res = wait_sd_response();
+            if wait_sd_response() == 0 {
+                // successful read!
+                break;
+            }
+
+            // try again
             sd_enable();
+            delay(5000);
+        }
 
-            if res == 1 {
-                times -= 1;
-                if times > 0 {
-                    delay(5000);
-                    continue;
-                }
-            }
-
-            unsafe {
-                let src = 0x9e00000 as *mut c_void;
-                let dst = (buffer as *mut [u8] as *mut c_void).add(i as usize * 512);
-                dma_copy(src, dst, blocks as u32 * 512);
-            }
-
-            break;
+        unsafe {
+            let src = 0x9e00000 as *mut c_void;
+            let dst = (buffer as *mut [u8] as *mut c_void).add(i as usize * 512);
+            dma_copy(src, dst, blocks as u32 * 512);
         }
     }
 

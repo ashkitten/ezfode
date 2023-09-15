@@ -2,7 +2,7 @@
 #![no_std]
 #![no_main]
 
-use fatfs::{FileSystem, FsOptions};
+use fatfs::{FileSystem, FsOptions, Read};
 use gba::prelude::*;
 use sd::SDCard;
 
@@ -22,10 +22,16 @@ extern "C" fn main() -> ! {
     DISPCNT.write(DisplayControl::new().with_show_bg0(true));
     BACKDROP_COLOR.write(Color::YELLOW);
 
-    let sd = SDCard::new();
-    let fs = FileSystem::new(sd, FsOptions::new()).unwrap();
-
-    BACKDROP_COLOR.write(Color::GREEN);
+    let mut sd = SDCard::new();
+    let mut buf = [0u8; 2048];
+    assert_eq!(sd.read(&mut buf), Ok(2048));
+    // check that buf isn't still zeroed
+    if !buf.iter().all(|b| *b == 0) {
+        BACKDROP_COLOR.write(Color::GREEN);
+    } else {
+        BACKDROP_COLOR.write(Color::MAGENTA);
+    }
+    // let fs = FileSystem::new(sd, FsOptions::new()).unwrap();
 
     loop {}
 }
