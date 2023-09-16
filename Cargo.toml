@@ -5,12 +5,14 @@ authors = ["ashkitten"]
 edition = "2021"
 
 [dependencies]
-ape-fatfs = { version = "0.2.0", default-features = false }
+ape-fatfs = { version = "0.2.0", default-features = false, features = ["unicode", "lfn"] }
 ape-mbr = "0.1.1"
 embedded-io = "0.4.0"
 gba = "0.11.2"
 gpt-parser = { version = "0.0.9", features = ["no_std"] }
+itoa = "1.0.9"
 log = "=0.4.19"
+ucs2 = "0.3.2"
 
 [profile.dev]
 opt-level = 3

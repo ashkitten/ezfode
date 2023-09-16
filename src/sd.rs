@@ -1,6 +1,9 @@
 use core::ffi::c_void;
 use core::fmt;
 
+use gba::prelude::BACKDROP_COLOR;
+use gba::video::Color;
+
 use crate::delay;
 use crate::dma::dma_copy;
 use crate::ezflash::set_rompage;
@@ -12,6 +15,7 @@ pub enum SdControl {
     ReadState = 3,
 }
 
+#[link_section = ".iwram"]
 pub unsafe fn set_sd_control(control: SdControl) {
     (0x9fe0000 as *mut u16).write_volatile(0xd200);
     (0x8000000 as *mut u16).write_volatile(0x1500);
@@ -21,22 +25,27 @@ pub unsafe fn set_sd_control(control: SdControl) {
     (0x9fc0000 as *mut u16).write_volatile(0x1500);
 }
 
+#[link_section = ".iwram"]
 pub unsafe fn sd_enable() {
     set_sd_control(SdControl::Enable);
 }
 
+#[link_section = ".iwram"]
 pub unsafe fn sd_disable() {
     set_sd_control(SdControl::Disable);
 }
 
+#[link_section = ".iwram"]
 pub unsafe fn sd_read_state() {
     set_sd_control(SdControl::ReadState);
 }
 
+#[link_section = ".iwram"]
 pub unsafe fn sd_response() -> u16 {
     (0x9e00000 as *mut u16).read_volatile()
 }
 
+#[link_section = ".iwram"]
 pub unsafe fn wait_sd_response() -> Result<(), ()> {
     for _ in 0..0x100000 {
         if sd_response() != 0xeee1 {
@@ -77,6 +86,7 @@ impl SdCard {
 impl BlockIo<512> for SdCard {
     type Error = BlockIoError;
 
+    #[link_section = ".iwram"]
     fn read_blocks(&mut self, start_lba: Lba, buffer: &mut [u8]) -> Result<(), Self::Error> {
         unsafe {
             set_rompage(0x8000); // OS mode
@@ -94,6 +104,8 @@ impl BlockIo<512> for SdCard {
 
                 // try three times to read
                 for _ in 0..2 {
+                    sd_enable();
+
                     (0x9fe0000 as *mut u16).write_volatile(0xd200);
                     (0x8000000 as *mut u16).write_volatile(0x1500);
                     (0x8020000 as *mut u16).write_volatile(0xd200);
@@ -105,6 +117,7 @@ impl BlockIo<512> for SdCard {
 
                     sd_read_state();
                     if wait_sd_response().is_ok() {
+                        sd_enable();
                         // successful read!
                         let src = 0x9e00000 as *mut c_void;
                         let dst = &mut buffer[i as usize * 512] as *mut u8 as *mut c_void;
@@ -114,13 +127,13 @@ impl BlockIo<512> for SdCard {
                         continue 'chunks;
                     } else {
                         // read timed out, try again
-                        sd_enable();
                         delay(5000);
                     }
                 }
 
                 // oh no! we couldn't read!
-                panic!();
+                BACKDROP_COLOR.write(Color::BLUE);
+                loop {}
             }
 
             sd_disable();
