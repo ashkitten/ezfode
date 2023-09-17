@@ -28,19 +28,9 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
         set_led_control(0b10100000);
     }
     BACKDROP_COLOR.write(Color::RED);
-
+    loop{}
     let mut itoa = itoa::Buffer::new();
-/*
-    let mut pos = 0;
-    let mut bytes = [0u8; 1024];
-    let mut write = |str: &str| {
-        // truncate silently
-        let end = bytes.len().min(pos + str.len());
-        let len = end - pos;
-        bytes[pos..end].copy_from_slice(&str.as_bytes()[..len]);
-        pos = end;
-    };
-*/
+
     let text_painter = unsafe { halfwidth::text_painter() };
     text_painter.setup_display();
 
@@ -55,8 +45,6 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     } else {
         text_painter.paint_text("unknown location");
     };
-
-    //draw_text(unsafe { core::str::from_utf8_unchecked(&bytes) });
 
     loop {}
 }
@@ -135,6 +123,7 @@ extern "C" fn main() -> ! {
     BACKDROP_COLOR.write(Color::YELLOW);
 
     draw_text("According to all known laws of aviation, there is no way for a bee to fly.\n\tHowever\rThe bee flies anyway because fuck you that's why.");
+    loop{};
     //draw_text("if\tfoo:\n\thello\r\tprint 'hello'");
     //panic!("According to all known laws of aviation, there is no way for a bee to fly.\n\tHowever\rThe bee flies anyway because fuck you that's why.");
 

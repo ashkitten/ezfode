@@ -1,4 +1,3 @@
-use core::mem::MaybeUninit;
 use gba::prelude::*;
 
 const FONT_WIDTH: usize = 4;
@@ -13,6 +12,8 @@ const WRAP_COL: usize = 60;
 #[link_section = ".ewram"]
 static mut PAINTER: TextPainter = TextPainter::new();
 
+type DoubleHalfTile = [u16; 2*8];
+
 pub unsafe fn text_painter() -> &'static mut TextPainter {
     //PAINTER.get_or_insert_with(TextPainter::new)
     /*if PAINTER.font[1][1] == 0 {
@@ -24,7 +25,7 @@ pub unsafe fn text_painter() -> &'static mut TextPainter {
     &mut PAINTER
 }
 
-#[repr(align(4))]
+#[repr(C, align(4))]
 pub struct TextPainter {
     // 96 printable ascii chars, each using half of a 8x8 4bpp tile
     font: [u8; 96*16],
@@ -41,16 +42,16 @@ impl TextPainter {
         }
     }
 
-    fn font(&self) -> &'static [Tile4] {
-        unsafe { core::slice::from_raw_parts(self.font.as_ptr() as *const Tile4, 96/2) }
+    fn font(&self) -> &'static [DoubleHalfTile] {
+        unsafe { core::slice::from_raw_parts(self.font.as_ptr() as *const DoubleHalfTile, 96/2) }
     }
 
-    fn charblock_read(&self, tile_index: usize, tile_row_index: usize) -> u32 {
-        unsafe { CHARBLOCK0_4BPP.index(tile_index).as_volblock().index(tile_row_index).read() }
-    }
-
-    fn charblock_write(&self, tile_index: usize, tile_row_index: usize, value: u32) {
-        unsafe { CHARBLOCK0_4BPP.index(tile_index).as_volblock().index(tile_row_index).write(value) }
+    fn charblock_write(&self, tile_index: usize, tile_row_index: usize, value: u16) {
+        unsafe {
+            let tile_ptr = (CHARBLOCK0_4BPP.as_ptr() as *mut DoubleHalfTile)
+                .add(tile_index);
+            (*tile_ptr).as_mut_ptr().add(tile_row_index).write_volatile(value);
+        }
     }
 
     pub fn setup_display(&mut self) {
@@ -114,27 +115,14 @@ impl TextPainter {
                     _ => {} // TODO?
                 }
             } else {
-                let even = c & 1 == 0;
                 let font_tile = &self.font()[(c - 0x20) >> 1];
                 let out_tile_col = self.pixel_col >> 3;
                 let mut out_pixel_row = self.pixel_row;
-                for mut font_row in font_tile.iter().copied() {
+                for font_row in font_tile.iter().skip(c & 1).step_by(2).take(FONT_HEIGHT).copied() {
                     let out_tile_row = out_pixel_row >> 3;
-                    let out_tile_pixel_row = out_pixel_row & 7;
-                    let mut mask = if even {
-                        0x0000ffff
-                    } else {
-                        0xffff0000
-                    };
-                    font_row &= mask;
-                    if even == ((self.pixel_col & FONT_WIDTH) != 0) {
-                        font_row = font_row.rotate_right(16);
-                    } else {
-                        mask = mask.rotate_right(16);
-                    }
+                    let out_tile_pixel_row = ((out_pixel_row & 7) << 1) + ((self.pixel_col & 4) >> 2);
                     let idx = out_tile_row * MAP_WIDTH + out_tile_col;
-                    let out_pixbuf = self.charblock_read(idx, out_tile_pixel_row);
-                    self.charblock_write(idx, out_tile_pixel_row, (out_pixbuf & mask) | font_row);
+                    self.charblock_write(idx, out_tile_pixel_row, font_row);
                     out_pixel_row += 1;
                     VBlankIntrWait();
                 }
