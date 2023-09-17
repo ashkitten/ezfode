@@ -1,3 +1,5 @@
+#![feature(ascii_char)]
+#![feature(const_slice_from_raw_parts_mut)]
 #![feature(int_roundings)]
 #![feature(generic_const_exprs)]
 #![no_std]
@@ -16,6 +18,7 @@ use sd::SdCard;
 mod dma;
 mod ezflash;
 mod fs;
+mod halfwidth;
 mod sd;
 
 #[panic_handler]
@@ -27,9 +30,9 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     BACKDROP_COLOR.write(Color::RED);
 
     let mut itoa = itoa::Buffer::new();
-
+/*
     let mut pos = 0;
-    let mut bytes = [0u8; 512];
+    let mut bytes = [0u8; 1024];
     let mut write = |str: &str| {
         // truncate silently
         let end = bytes.len().min(pos + str.len());
@@ -37,17 +40,23 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
         bytes[pos..end].copy_from_slice(&str.as_bytes()[..len]);
         pos = end;
     };
+*/
+    let text_painter = unsafe { halfwidth::text_painter() };
+    text_painter.setup_display();
 
-    write("panic at ");
+    if let Some(s) = info.payload().downcast_ref::<&str>() {
+        text_painter.paint_text(s);
+    }
+    text_painter.paint_text("panic at ");
     if let Some(location) = info.location() {
-        write(location.file().rsplit_terminator('/').next().unwrap());
-        write(" line ");
-        write(itoa.format(location.line()));
+        text_painter.paint_text(location.file());
+        text_painter.paint_text(":");
+        text_painter.paint_text(itoa.format(location.line()));
     } else {
-        write("unknown location");
+        text_painter.paint_text("unknown location");
     };
 
-    draw_text(unsafe { core::str::from_utf8_unchecked(&bytes) });
+    //draw_text(unsafe { core::str::from_utf8_unchecked(&bytes) });
 
     loop {}
 }
@@ -85,8 +94,14 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
 extern "C" fn irq_handler(_: IrqBits) {}
 
 fn draw_text(text: &str) {
+    let text_painter = unsafe { halfwidth::text_painter() };
+    text_painter.setup_display();
+    text_painter.paint_text(text);
+}
+
+fn _asdf(text: &str) {
     Cga8x8Thick.bitunpack_4bpp(CHARBLOCK0_4BPP.as_region(), 0);
-    BG0CNT.write(BackgroundControl::new().with_screenblock(8));
+    BG0CNT.write(BackgroundControl::new().with_size(2).with_screenblock(8));
 
     let screenblock = TEXT_SCREENBLOCKS.get_frame(8).unwrap();
     for x in 0..32 {
@@ -118,6 +133,11 @@ extern "C" fn main() -> ! {
 
     DISPCNT.write(DisplayControl::new().with_show_bg0(true));
     BACKDROP_COLOR.write(Color::YELLOW);
+
+    draw_text("According to all known laws of aviation, there is no way for a bee to fly.\n\tHowever\rThe bee flies anyway because fuck you that's why.");
+    //draw_text("if\tfoo:\n\thello\r\tprint 'hello'");
+    //panic!("According to all known laws of aviation, there is no way for a bee to fly.\n\tHowever\rThe bee flies anyway because fuck you that's why.");
+
     unsafe {
         // red+green + blue sd indicator
         set_led_control(0b10110001);
