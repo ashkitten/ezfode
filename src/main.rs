@@ -2,6 +2,7 @@
 #![feature(const_slice_from_raw_parts_mut)]
 #![feature(int_roundings)]
 #![feature(generic_const_exprs)]
+#![feature(panic_info_message)]
 #![no_std]
 #![no_main]
 
@@ -9,10 +10,11 @@ use core::str::from_utf8_unchecked;
 
 use ape_fatfs::fs::{FileSystem, FsOptions};
 use ape_mbr::{PartitionId, MBR};
+use core::fmt::Write;
 use ezflash::set_led_control;
 use fs::BufferedIo;
 use gba::prelude::*;
-use log::Log;
+use halfwidth::TextPainter;
 use sd::SdCard;
 
 mod dma;
@@ -21,6 +23,7 @@ mod fs;
 mod halfwidth;
 mod sd;
 
+#[allow(unused_must_use)]
 #[panic_handler]
 fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     unsafe {
@@ -28,25 +31,28 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
         set_led_control(0b10100000);
     }
     BACKDROP_COLOR.write(Color::RED);
-    loop{}
-    let mut itoa = itoa::Buffer::new();
 
-    let text_painter = unsafe { halfwidth::text_painter() };
+    let mut text_painter = TextPainter::new();
     text_painter.setup_display();
 
-    if let Some(s) = info.payload().downcast_ref::<&str>() {
-        text_painter.paint_text(s);
-    }
-    text_painter.paint_text("panic at ");
+    text_painter.write_str("panic at ");
     if let Some(location) = info.location() {
-        text_painter.paint_text(location.file());
-        text_painter.paint_text(":");
-        text_painter.paint_text(itoa.format(location.line()));
+        write!(&mut text_painter, "{}:{}", location.file(), location.line());
     } else {
-        text_painter.paint_text("unknown location");
+        text_painter.write_str("unknown location");
     };
+    if let Some(msg) = info.message() {
+        write!(&mut text_painter, ":\n");
+        core::fmt::write(&mut text_painter, *msg);
+    }
+    if let Some(s) = info.payload().downcast_ref::<&str>() {
+        text_painter.write_str("\n");
+        text_painter.write_str(s);
+    }
 
-    loop {}
+    loop {
+        VBlankIntrWait();
+    }
 }
 
 // static LOGGER: ScreenLogger = ScreenLogger::new();
@@ -80,12 +86,6 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
 // }
 
 extern "C" fn irq_handler(_: IrqBits) {}
-
-fn draw_text(text: &str) {
-    let text_painter = unsafe { halfwidth::text_painter() };
-    text_painter.setup_display();
-    text_painter.paint_text(text);
-}
 
 fn _asdf(text: &str) {
     Cga8x8Thick.bitunpack_4bpp(CHARBLOCK0_4BPP.as_region(), 0);
@@ -122,9 +122,9 @@ extern "C" fn main() -> ! {
     DISPCNT.write(DisplayControl::new().with_show_bg0(true));
     BACKDROP_COLOR.write(Color::YELLOW);
 
-    draw_text("According to all known laws of aviation, there is no way for a bee to fly.\n\tHowever\rThe bee flies anyway because fuck you that's why.");
-    loop{};
-    //draw_text("if\tfoo:\n\thello\r\tprint 'hello'");
+    let mut text_painter = TextPainter::new();
+    text_painter.setup_display();
+
     //panic!("According to all known laws of aviation, there is no way for a bee to fly.\n\tHowever\rThe bee flies anyway because fuck you that's why.");
 
     unsafe {
@@ -132,7 +132,7 @@ extern "C" fn main() -> ! {
         set_led_control(0b10110001);
     }
 
-    draw_text("hello world!");
+    text_painter.paint_text("hello world!");
 
     let mut mbr = MBR::new(BufferedIo::<512, 2048, _>::new(SdCard)).unwrap();
     let partition = mbr.get_partition(PartitionId::One).unwrap();
@@ -164,7 +164,7 @@ extern "C" fn main() -> ! {
             pos += 1;
         }
 
-        draw_text(unsafe { from_utf8_unchecked(&bytes) });
+        text_painter.paint_text(unsafe { from_utf8_unchecked(&bytes) });
     }
 
     loop {}
