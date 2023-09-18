@@ -6,56 +6,7 @@ use gba::video::Color;
 
 use crate::delay;
 use crate::dma::dma_copy;
-use crate::ezflash::set_rompage;
-
-#[repr(u16)]
-pub enum SdControl {
-    Disable = 0,
-    Enable = 1,
-    ReadState = 3,
-}
-
-#[link_section = ".iwram"]
-pub unsafe fn set_sd_control(control: SdControl) {
-    (0x9fe0000 as *mut u16).write_volatile(0xd200);
-    (0x8000000 as *mut u16).write_volatile(0x1500);
-    (0x8020000 as *mut u16).write_volatile(0xd200);
-    (0x8040000 as *mut u16).write_volatile(0x1500);
-    (0x9400000 as *mut u16).write_volatile(control as u16);
-    (0x9fc0000 as *mut u16).write_volatile(0x1500);
-}
-
-#[link_section = ".iwram"]
-pub unsafe fn sd_enable() {
-    set_sd_control(SdControl::Enable);
-}
-
-#[link_section = ".iwram"]
-pub unsafe fn sd_disable() {
-    set_sd_control(SdControl::Disable);
-}
-
-#[link_section = ".iwram"]
-pub unsafe fn sd_read_state() {
-    set_sd_control(SdControl::ReadState);
-}
-
-#[link_section = ".iwram"]
-pub unsafe fn sd_response() -> u16 {
-    (0x9e00000 as *mut u16).read_volatile()
-}
-
-#[link_section = ".iwram"]
-pub unsafe fn wait_sd_response() -> Result<(), ()> {
-    for _ in 0..0x100000 {
-        if sd_response() != 0xeee1 {
-            return Ok(());
-        }
-    }
-
-    // timeout!
-    Err(())
-}
+use crate::ezflash::{sd_disable, sd_enable, sd_read_state, set_rompage, wait_sd_response};
 
 pub type Lba = u32;
 

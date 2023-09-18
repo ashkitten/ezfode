@@ -7,10 +7,9 @@ use core::str::from_utf8_unchecked;
 
 use ape_fatfs::fs::{FileSystem, FsOptions};
 use ape_mbr::{PartitionId, MBR};
-use ezflash::set_led_control;
+use ezflash::{set_led_control, set_psrampage};
 use fs::BufferedIo;
 use gba::prelude::*;
-use log::Log;
 use sd::SdCard;
 
 mod dma;
