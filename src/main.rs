@@ -1,8 +1,11 @@
-#![feature(ascii_char)]
-#![feature(const_slice_from_raw_parts_mut)]
-#![feature(int_roundings)]
-#![feature(generic_const_exprs)]
-#![feature(panic_info_message)]
+#![feature(
+    ascii_char,
+    const_slice_from_raw_parts_mut,
+    int_roundings,
+    generic_const_exprs,
+    panic_info_message,
+    exclusive_range_pattern
+)]
 #![no_std]
 #![no_main]
 
@@ -13,7 +16,7 @@ use ezflash::set_led_control;
 use fs::BufferedIo;
 use gba::prelude::*;
 use halfwidth::TextPainter;
-use log::{error, info, Log};
+use log::{debug, error, info, trace, warn, Level, Log};
 use sd::SdCard;
 
 mod dma;
@@ -25,6 +28,18 @@ mod sd;
 static mut PAINTER: TextPainter = TextPainter::new();
 static LOGGER: ScreenLogger = ScreenLogger;
 
+macro_rules! print {
+    ($($args:expr),*) => {
+        unsafe { write!(PAINTER, $($args),*).unwrap() }
+    };
+}
+
+macro_rules! println {
+    ($($args:expr),*) => {
+        unsafe { writeln!(PAINTER, $($args),*).unwrap() }
+    };
+}
+
 struct ScreenLogger;
 
 impl Log for ScreenLogger {
@@ -33,7 +48,14 @@ impl Log for ScreenLogger {
     }
 
     fn log(&self, record: &log::Record) {
-        unsafe { writeln!(PAINTER, "{} - {}", record.level(), record.args()).unwrap() };
+        let color = match record.level() {
+            Level::Error => "\x1b[91m", // bright red
+            Level::Warn => "\x1b[93m",  // bright yellow
+            Level::Info => "\x1b[94m",  // bright blue
+            Level::Debug => "\x1b[95m", // bright magenta
+            Level::Trace => "\x1b[37m", // white
+        };
+        println!("{}{}\x1b[m", color, record.args());
     }
 
     fn flush(&self) {}
@@ -46,7 +68,6 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
         // red+green
         set_led_control(0b10100000);
     }
-    BACKDROP_COLOR.write(Color::new().with_red(8));
 
     if let Some(location) = info.location() {
         error!("panic at {}:{}:", location.file(), location.line());
@@ -94,20 +115,24 @@ extern "C" fn main() -> ! {
     DISPCNT.write(DisplayControl::new().with_show_bg0(true));
 
     unsafe {
+        // red+green + blue sd indicator
+        set_led_control(0b10110001);
+
         PAINTER.setup_display();
-        BACKDROP_COLOR.write(Color::new().with_green(8));
+
         log::set_logger_racy(&LOGGER).unwrap();
         log::set_max_level_racy(log::LevelFilter::Trace);
     }
 
-    //panic!("According to all known laws of aviation, there is no way for a bee to fly.\n\tHowever\rThe bee flies anyway because fuck you that's why.");
+    println!("hello world!");
 
-    unsafe {
-        // red+green + blue sd indicator
-        set_led_control(0b10110001);
-    }
+    trace!("this is a trace message");
+    debug!("this is a debug message");
+    info!("this is an info message");
+    warn!("this is a warning message");
+    error!("this is an error message");
 
-    info!("hello world!");
+    println!("speaking of which,");
 
     let mut mbr = MBR::new(BufferedIo::<512, 2048, _>::new(SdCard)).unwrap();
     let partition = mbr.get_partition(PartitionId::One).unwrap();
