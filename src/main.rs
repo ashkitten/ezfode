@@ -5,8 +5,6 @@
     generic_const_exprs,
     panic_info_message,
     exclusive_range_pattern,
-    const_for,
-    const_trait_impl,
     const_mut_refs
 )]
 #![no_std]
