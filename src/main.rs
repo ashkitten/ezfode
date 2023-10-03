@@ -4,7 +4,10 @@
     int_roundings,
     generic_const_exprs,
     panic_info_message,
-    exclusive_range_pattern
+    exclusive_range_pattern,
+    const_for,
+    const_trait_impl,
+    const_mut_refs
 )]
 #![no_std]
 #![no_main]
@@ -63,41 +66,59 @@ impl Log for ScreenLogger {
 
 #[allow(unused_must_use)]
 #[panic_handler]
+#[link_section = ".iwram"]
 fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     unsafe {
         // red+green
         set_led_control(0b10100000);
     }
 
+    // black text on red background
+    print!("\x1b[97m\x1b[41m");
+
     if let Some(location) = info.location() {
-        error!("panic at {}:{}:", location.file(), location.line());
+        println!("panic at {}:{}:", location.file(), location.line());
     } else {
-        error!("panic at unknown location:");
+        println!("panic at unknown location:");
     };
     if let Some(msg) = info.message() {
-        error!("{}", *msg);
+        println!("{}", *msg);
     }
+
+    // reset
+    print!("\x1b[m");
 
     loop {
         VBlankIntrWait();
     }
 }
 
+#[link_section = ".iwram"]
 extern "C" fn irq_handler(irq: IrqBits) {
-    if irq.hblank() {
-        let next_vcount = VCOUNT.read() + 1;
-        // overscan region
-        if next_vcount > 160 {
-            BG0VOFS.write(0);
-            BG1VOFS.write(0);
-            BG2VOFS.write(0);
-            BG3VOFS.write(0);
-        } else if next_vcount % 6 == 0 {
-            BG0VOFS.write(next_vcount / 3);
-            BG1VOFS.write(next_vcount / 3);
-            BG2VOFS.write(next_vcount / 3);
-            BG3VOFS.write(next_vcount / 3);
+    // maximum value of VCOUNT is 227
+    const OFFSET_LUT: [u8; 228] = {
+        let mut lut = [0u8; 228];
+
+        let mut offset = 0;
+        // can't use for loops in const exprs yet
+        let mut i = 0;
+        while i < 160 {
+            if (i + 1) % 6 == 0 {
+                offset = (i + 1) / 3;
+            }
+            lut[i as usize] = offset;
+            i += 1;
         }
+
+        lut
+    };
+
+    if irq.hblank() {
+        let offset = OFFSET_LUT[VCOUNT.read() as usize];
+        BG0VOFS.write(offset as u16);
+        BG1VOFS.write(offset as u16);
+        BG2VOFS.write(offset as u16);
+        BG3VOFS.write(offset as u16);
     }
 }
 
@@ -131,8 +152,6 @@ extern "C" fn main() -> ! {
     info!("this is an info message");
     warn!("this is a warning message");
     error!("this is an error message");
-
-    println!("speaking of which,");
 
     let mut mbr = MBR::new(BufferedIo::<512, 2048, _>::new(SdCard)).unwrap();
     let partition = mbr.get_partition(PartitionId::One).unwrap();

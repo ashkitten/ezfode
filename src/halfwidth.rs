@@ -85,7 +85,9 @@ impl TextPainter {
         }
 
         // one tile background
-        CHARBLOCK1_4BPP.get(0).unwrap().write([0x0000ffff; 8]);
+        CHARBLOCK1_4BPP.get(0).unwrap().write([0x00001111; 8]);
+
+        // clear screenblocks
         for screenblock in 16..=19 {
             let frame = TEXT_SCREENBLOCKS.get_frame(screenblock).unwrap();
             for r in 0..32 {
@@ -149,10 +151,11 @@ impl Perform for TextPainter {
             self.col = 0;
         }
 
-        let fg = TEXT_SCREENBLOCKS.get_frame(16 + (self.col & 1)).unwrap();
-        let bg = TEXT_SCREENBLOCKS.get_frame(18 + (self.col & 1)).unwrap();
+        let fg_cell = TEXT_SCREENBLOCKS.get_frame(16 + (self.col & 1)).unwrap();
+        let bg_cell = TEXT_SCREENBLOCKS.get_frame(18 + (self.col & 1)).unwrap();
 
-        fg.get_row(self.row)
+        fg_cell
+            .get_row(self.row)
             .unwrap()
             .get(self.col >> 1)
             .unwrap()
@@ -162,11 +165,12 @@ impl Perform for TextPainter {
                     .with_palbank(self.fg),
             );
 
-        bg.get_row(self.row)
+        bg_cell
+            .get_row(self.row)
             .unwrap()
             .get(self.col >> 1)
             .unwrap()
-            .write(TextEntry::new().with_tile(1).with_palbank(self.bg));
+            .write(TextEntry::new().with_tile(0).with_palbank(self.bg));
 
         self.col += 1;
     }
