@@ -1,0 +1,17 @@
+  Pin  Name  Cable
+  1    VDD35 Blue      GBA Socket     GBA Plug   Old "8bit" Plug
+  2    SO    Red       ___________    _________    ___________
+  3    SI    Green    |  2  4  6  |  / 2  4  6 \  |  2  4  6  |
+  4    SD    Yellow    \_1_ 3 _5_/   \_1_ 3 _5_/   \_1__3__5_/
+  5    SC    Orange        '-'           '-'
+  6    GND   Brown    Socket Outside View / Plug Inside View
+  Shield     Black
+
+
+Pin  Name   Cable
+1           Black
+2    +DATA  Brown
+3    Vcc    Red
+4    GND    Orange
+5           Yellow
+6    +CLK   Green
